@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class SiteState {
     //boolean valid;
@@ -105,6 +106,7 @@ public class TicketingDS implements TicketingSystem {
     // NOTICE: allSitesState和FreeList里的SiteState是共享的，因为初始化成了引用,
     // 不需要重新调用allSitesState的set方法对值进行设置，利用引用直接设置即可
     private ArrayList<SiteState> allSitesState;
+    private ArrayList<ReentrantReadWriteLock> routeLocks;
     private Map<Long, SiteState> getTidSiteState;
     //指定车次的FreeList，索引从0开始
     private ArrayList<LinkedList<SiteState>> FreeList;
@@ -146,6 +148,7 @@ public class TicketingDS implements TicketingSystem {
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
         FreeList = new ArrayList<>(_routenum);
         getTidSiteState = new HashMap<>();
+        routeLocks = new ArrayList<>(_routenum);
 
         for (int routeIndex = 0; routeIndex < _routenum; routeIndex++) {
             FreeList.add(new LinkedList<>());
@@ -153,6 +156,7 @@ public class TicketingDS implements TicketingSystem {
         // initial Data Structures
         int k = 0;
         for (int _routenumT = 0; _routenumT < _routenum; _routenumT++) {
+            routeLocks.add(_routenumT, new ReentrantReadWriteLock());
             for (int _coachnumT = 0; _coachnumT < _coachnum; _coachnumT++){
                 for (int _seatnumT = 0; _seatnumT < _seatnum; _seatnumT++) {
                     SiteState temp = new SiteState(_routenumT + 1, _coachnumT + 1, _seatnumT + 1);
@@ -173,7 +177,8 @@ public class TicketingDS implements TicketingSystem {
         boolean needNext = true;
         Ticket ticket = null;
         while(needNext) {
-            lock.lock();
+            //lock.lock();
+            routeLocks.get(route - 1).writeLock().lock();
             try {
                 LinkedList<SiteState> FreeRouteList = FreeList.get(route - 1);
 
@@ -234,7 +239,8 @@ public class TicketingDS implements TicketingSystem {
                 }
                 needNext = false;
             }finally {
-                lock.unlock();
+                //lock.unlock();
+                routeLocks.get(route - 1).writeLock().unlock();
             }
         }
 
@@ -248,7 +254,8 @@ public class TicketingDS implements TicketingSystem {
         boolean needNext = true;
         int num = 0;
         while(needNext) {
-            lock.lock();
+            //lock.lock();
+            routeLocks.get(route - 1).readLock().lock();
             try {
                 for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
                     // System.out.print(allSitesState.get(i).toAllString());
@@ -258,7 +265,8 @@ public class TicketingDS implements TicketingSystem {
                 }
                 needNext = false;
             } finally {
-                lock.unlock();
+                //lock.unlock();
+                routeLocks.get(route - 1).readLock().unlock();
             }
         }
 
@@ -269,9 +277,10 @@ public class TicketingDS implements TicketingSystem {
     public boolean refundTicket(Ticket ticket) {
         boolean needNext = true;
         boolean flag = false;
-
+        int route = ticket.route;
         while (needNext) {
-            lock.lock();
+            //lock.lock();
+            routeLocks.get(route - 1).writeLock().lock();
             try {
                 if (!tids.containsKey(ticket.tid) || !tids.get(ticket.tid) || illegal(ticket)){
                     // flag = false;
@@ -293,7 +302,8 @@ public class TicketingDS implements TicketingSystem {
                 }
                 needNext = false;
             } finally {
-                lock.unlock();
+                //lock.unlock();
+                routeLocks.get(route - 1).writeLock().unlock();
             }
         }
         // 如果tid是无效的，或者已经被回收了，那失败，否则退票
