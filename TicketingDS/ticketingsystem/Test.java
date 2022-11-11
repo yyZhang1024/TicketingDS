@@ -3,10 +3,10 @@ package ticketingsystem;
 
 public class Test {
 	public static void asserts(boolean t){
-		if(!t){
-			System.out.println("ERROR!!!");
-			System.exit(-1);
-		}
+//		if(!t){
+//			System.out.println("ERROR!!!");
+//			System.exit(-1);
+//		}
 	}
 	public static void main(String[] args) throws InterruptedException {
         int routenum = 3;
