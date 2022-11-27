@@ -1,6 +1,7 @@
 package ticketingsystem;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -9,90 +10,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 class BitMap {
 
 }
-class SiteState {
-    //boolean valid;
-    private volatile int  SiteRouteId;   // 车次
-    private volatile int SiteCoachId;   // 车厢号
-    private volatile int SiteSeatId;    // 座位号
-    //    boolean haveOnes;   // 是否被占用
-    private LinkedList<Ticket> passengerTickets;
-    @Override
-    public String toString(){
-        String pnt = " SiteState   SiteRouteId: " + SiteRouteId + " SiteCoachId: " + SiteCoachId + " SiteSeatId: " + SiteSeatId + "\n";
-        return pnt;
-    }
-    public String toAllString(){
-        // String pnt = " SiteState   SiteRouteId: " + SiteRouteId + " SiteCoachId: " + SiteCoachId + " SiteSeatId: " + SiteSeatId;
-        String pnt = "\n";
-        for (Ticket ticket: passengerTickets) {
-            pnt += ticket.passenger +  " route: " + ticket.route +  " tid: " + ticket.tid +  " departure: " + ticket.departure +  " arrival:" + ticket.arrival +  "\n";
-        }
-        return pnt;
-    }
-    //    public int GetRoute() {
-    //        return SiteRouteId;
-    //    }
-    public int GetCoach() {
-        return SiteCoachId;
-    }
-    public int GetSeat() {
-        return SiteSeatId;
-    }
-    public SiteState(int routeid, int coachid, int seatid) {
-        SiteRouteId = routeid;
-        SiteCoachId = coachid;
-        SiteSeatId = seatid;
-        // haveOnes = false;
-        passengerTickets = new LinkedList();
-        // valid = true;
-    }
-    public boolean isNonePassenger(){
-        return passengerTickets.isEmpty();
-    }
-    public boolean AddPassenger(Ticket ticket) {
-        // return passengerTickets.add(ticket);
-        boolean t = passengerTickets.add(ticket);
-        assert (t);
-        return true;
-    }
 
-    public boolean RemovePassenger(Ticket ticket) {
-        // return passengerTickets.remove(ticket);
-        boolean t = passengerTickets.remove(ticket);
-        assert (t);
-        return true;
-    }
-    private boolean IsCross(int departure1, int departure2, int arrival1, int arrival2)
-    {
-        // int departure = Math.max(departure1, departure2);
-        // int arrival = Math.min(arrival1, arrival2);
-        // return arrival >= departure;
-        // return !((arrival1 <= departure2) || (departure1 >= arrival2));
-        return arrival2 >= departure1 && arrival2 <= arrival1 || departure2 >= departure1 && departure2 <= arrival1 || departure1 >= departure2 && departure1 <= arrival2 || arrival1 >= departure2 && arrival1 <= arrival2;
-    }
-    public boolean haveSite(int departure, int arrival) {
-        for(Ticket ticket : passengerTickets){
-            if (IsCross(departure, ticket.departure, arrival - 1, ticket.arrival - 1)) {
-                // if (IsCross(departure, ticket.departure, arrival, ticket.arrival)) {
-                return false;
-            }
-        }
-        return true;
-
-    }
-
-    public SiteState() {
-        // haveOnes = false;
-        // valid = false;
-    }
-}
 public class TicketingDS implements TicketingSystem {
     private final int routenum;      // 车次 数目
     private final int coachnum;      // 每次列车的车厢数目
     private final int seatnum;       // 每节车厢的座位 数目
     private final int stationnum;    // 每个车次经停站的数量
     private final int threadnum;     // 线程数目
-    private Map<Long, Boolean> tids = new HashMap<>();            // 生成这个tid，用于判断票是否有效，注意：不能用来判断是否还有座位和回收，因为tid一个只会被用一次
+    private Map<Long, Boolean> tids; // 生成这个tid，用于判断票是否有效，注意：不能用来判断是否还有座位和回收，因为tid一个只会被用一次
 
     // 买票的话有两种情况
     // case 1： 本身就有座位，那直接返回
@@ -131,7 +56,7 @@ public class TicketingDS implements TicketingSystem {
         return route * coachnum * seatnum;
     }
 
-    private boolean illegal(Ticket ticket) {
+    boolean illegal(Ticket ticket) {
         if (ticket.arrival > stationnum || ticket.arrival <= ticket.departure || ticket.departure < 1) {
             return false;
         }
@@ -143,7 +68,7 @@ public class TicketingDS implements TicketingSystem {
         seatnum = _seatnum;
         stationnum = _stationnum;
         threadnum = _threadnum;
-        tids = new HashMap<>();
+        tids = new ConcurrentHashMap<>();
         nextTid = new AtomicLong();
         lock = new ReentrantLock();
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
@@ -173,10 +98,12 @@ public class TicketingDS implements TicketingSystem {
         }
     }
 
+
     @Override
     public Ticket buyTicket(String passenger, int route, int departure, int arrival) {
         boolean needNext = true;
         Ticket ticket = null;
+
         routeLocks.get(route - 1).writeLock().lock();
         try {
             LinkedList<SiteState> FreeRouteList = FreeList.get(route - 1);
@@ -185,7 +112,7 @@ public class TicketingDS implements TicketingSystem {
                 // FIRST出, LAST进
                 // FreeRouteList.getFirst();
                 SiteState newSite =  FreeRouteList.removeFirst();
-                ticket = new Ticket();
+                ticket = new Ticket(); // if move out ticket will have ABA problem
                 // nextTid需要一个锁
                 ticket.tid = nextTid.getAndIncrement();
                 ticket.passenger = passenger;
@@ -260,29 +187,29 @@ public class TicketingDS implements TicketingSystem {
         boolean needNext = true;
         boolean flag = false;
         int route = ticket.route;
-        routeLocks.get(route - 1).writeLock().lock();
-        try {
-            if (!tids.containsKey(ticket.tid) || !tids.get(ticket.tid) || illegal(ticket)){
+        if (!tids.containsKey(ticket.tid) || !tids.get(ticket.tid) || illegal(ticket)){
+            // flag = false;
+        } else {
+            // 进行退票，并且需要checkSite是否没其它的人在同样的座位上了，如果没有了就把座位重新加入FreeList里
+            if (!tids.get(ticket.tid)) {
                 // flag = false;
             } else {
-                // 进行退票，并且需要checkSite是否没其它的人在同样的座位上了，如果没有了就把座位重新加入FreeList里
-                if (!tids.get(ticket.tid)) {
-                    // flag = false;
-                } else {
-                    // flag = true;
+                // flag = true;
+                routeLocks.get(route - 1).writeLock().lock();
+                try {
                     tids.put(ticket.tid, false);
                     SiteState siteState = getTidSiteState.get(ticket.tid);
                     flag = siteState.RemovePassenger(ticket);
                     if(siteState.isNonePassenger()){
                         FreeList.get(ticket.route - 1).add(siteState);
                     }
+                } finally {
+                    //lock.unlock();
+                    routeLocks.get(route - 1).writeLock().unlock();
                 }
             }
-            needNext = false;
-        } finally {
-            //lock.unlock();
-            routeLocks.get(route - 1).writeLock().unlock();
         }
+        needNext = false;
         // 如果tid是无效的，或者已经被回收了，那失败，否则退票
         return flag;
     }
