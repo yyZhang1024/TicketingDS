@@ -13,7 +13,8 @@ public class Test {
 //		}
 	}
 	final static Random rand = new Random();
-	static int testnum = 50;
+	static int testnum = 10;
+	static boolean needOutput = true;
 	static int routenum = 3;
 	static int coachnum = 3;
 	static int seatnum = 5;
@@ -191,7 +192,7 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 								long preTime = System.nanoTime() - startTime;
 								boolean flag = execute(j);
 								long postTime = System.nanoTime() - startTime;
-								if(flag){
+								if(flag && needOutput){
 									print(preTime, postTime, methodList.get(j));
 								}
 								cnt += freqList.get(j);
@@ -201,11 +202,21 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 
 				}
 			});
+			// threads[i].start();
+		}
+		final long testStartTime = System.nanoTime();
+		for (int i = 0; i < threadnum; i++) {
 			threads[i].start();
 		}
 		for (int i = 0; i< threadnum; i++) {
 			threads[i].join();
 		}
+		final long testFinishTime = System.nanoTime();
+		int totalTestNum = testnum * threadnum ;
+		final long actualUseNs = testFinishTime - testStartTime - totalTestNum * nsec - totalTestNum * msec * 10000000L;
+		final long timeUse = actualUseNs/(1000);
+		System.out.println("Multi Thread Test Using:" + timeUse + "us");
+		System.out.println("times/thread:" + timeUse/totalTestNum + "us/thread");
 	}
 	public static void main(String[] args) throws InterruptedException {
         routenum = 3;
@@ -213,7 +224,10 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 		seatnum = 5;
 		stationnum = 5;
 		threadnum = 2;
-
+		msec = 0;
+		nsec = 50;
+		testnum = 500;
+		needOutput = false;
 		// sampleSeqTest();
 		multiThreadTest();
 	}
