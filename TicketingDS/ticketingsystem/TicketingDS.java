@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.StampedLock;
 
 class BitMap {
 
@@ -34,7 +35,7 @@ public class TicketingDS implements TicketingSystem {
     // NOTICE: allSitesState和FreeList里的SiteState是共享的，因为初始化成了引用,
     // 不需要重新调用allSitesState的set方法对值进行设置，利用引用直接设置即可
     private ArrayList<SiteState> allSitesState;
-    private ArrayList<ReentrantReadWriteLock> routeLocks;
+    private ArrayList<StampedLock> routeLocks;
     private Map<Long, SiteState> getTidSiteState;
     //指定车次的FreeList，索引从0开始
     private ArrayList<LinkedList<SiteState>> FreeList;
@@ -82,7 +83,7 @@ public class TicketingDS implements TicketingSystem {
         // initial Data Structures
         int k = 0;
         for (int _routenumT = 0; _routenumT < _routenum; _routenumT++) {
-            routeLocks.add(_routenumT, new ReentrantReadWriteLock());
+            routeLocks.add(_routenumT, new StampedLock());
             for (int _coachnumT = 0; _coachnumT < _coachnum; _coachnumT++){
                 for (int _seatnumT = 0; _seatnumT < _seatnum; _seatnumT++) {
                     SiteState temp = new SiteState(_routenumT + 1, _coachnumT + 1, _seatnumT + 1);
@@ -103,61 +104,54 @@ public class TicketingDS implements TicketingSystem {
     public Ticket buyTicket(String passenger, int route, int departure, int arrival) {
         boolean needNext = true;
         Ticket ticket = null;
-
-        routeLocks.get(route - 1).writeLock().lock();
-        try {
-            LinkedList<SiteState> FreeRouteList = FreeList.get(route - 1);
-            // FreeList需要进一步封装，保存一个变量表示是否还有空位，如果直接访问FreeRouteList需要加锁
-            if(!FreeRouteList.isEmpty()) {
-                // FIRST出, LAST进
-                // FreeRouteList.getFirst();
-                SiteState newSite =  FreeRouteList.removeFirst();
-                ticket = new Ticket(); // if move out ticket will have ABA problem
-                // nextTid需要一个锁
-                ticket.tid = nextTid.getAndIncrement();
-                ticket.passenger = passenger;
-                ticket.route = route;
-                ticket.coach = newSite.GetCoach();
-                ticket.seat = newSite.GetSeat();
-                ticket.departure = departure;
-                ticket.arrival = arrival;
-                newSite.AddPassenger(ticket);
-                getTidSiteState.put(ticket.tid, newSite);
-                // 分配tid
-                tids.put(ticket.tid, true);
-                //nextTid++;
-            }else {
-                // travel
-                // 注意这时候访问FreeList会出错，需要拿到FreeList的锁
-                // 因为过程中可能会有人退票，这时候买票方法不会出错，但是退票会重新把座位
-                // 加入FreeList，此时可能卖出去票但FreeList不知道，所以同样需要加锁.
-                for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
-                    SiteState newSite =  allSitesState.get(i);
-                    if (newSite.haveSite(departure, arrival)) {
-                        ticket = new Ticket();
-                        // nextTid需要一个锁
-                        ticket.tid = nextTid.getAndIncrement();
-                        ticket.passenger = passenger;
-                        ticket.route = route;
-                        ticket.coach = newSite.GetCoach();
-                        ticket.seat = newSite.GetSeat();
-                        ticket.departure = departure;
-                        ticket.arrival = arrival;
-                        newSite.AddPassenger(ticket);
-                        getTidSiteState.put(ticket.tid, newSite);
-                        // 分配tid
-                        tids.put(ticket.tid, true);
-                        break;
-                        // return ticket;
-                    }
+        long stamp = routeLocks.get(route - 1).writeLock();
+        LinkedList<SiteState> FreeRouteList = FreeList.get(route - 1);
+        // FreeList需要进一步封装，保存一个变量表示是否还有空位，如果直接访问FreeRouteList需要加锁
+        if(!FreeRouteList.isEmpty()) {
+            // FIRST出, LAST进
+            // FreeRouteList.getFirst();
+            SiteState newSite =  FreeRouteList.removeFirst();
+            ticket = new Ticket(); // if move out ticket will have ABA problem
+            // nextTid需要一个锁
+            ticket.tid = nextTid.getAndIncrement();
+            ticket.passenger = passenger;
+            ticket.route = route;
+            ticket.coach = newSite.GetCoach();
+            ticket.seat = newSite.GetSeat();
+            ticket.departure = departure;
+            ticket.arrival = arrival;
+            newSite.AddPassenger(ticket);
+            getTidSiteState.put(ticket.tid, newSite);
+            // 分配tid
+            tids.put(ticket.tid, true);
+            //nextTid++;
+        }else {
+            // travel
+            // 注意这时候访问FreeList会出错，需要拿到FreeList的锁
+            // 因为过程中可能会有人退票，这时候买票方法不会出错，但是退票会重新把座位
+            // 加入FreeList，此时可能卖出去票但FreeList不知道，所以同样需要加锁.
+            for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
+                SiteState newSite =  allSitesState.get(i);
+                if (newSite.haveSite(departure, arrival)) {
+                    ticket = new Ticket();
+                    // nextTid需要一个锁
+                    ticket.tid = nextTid.getAndIncrement();
+                    ticket.passenger = passenger;
+                    ticket.route = route;
+                    ticket.coach = newSite.GetCoach();
+                    ticket.seat = newSite.GetSeat();
+                    ticket.departure = departure;
+                    ticket.arrival = arrival;
+                    newSite.AddPassenger(ticket);
+                    getTidSiteState.put(ticket.tid, newSite);
+                    // 分配tid
+                    tids.put(ticket.tid, true);
+                    break;
                 }
             }
-            needNext = false;
-        }finally {
-            //lock.unlock();
-            routeLocks.get(route - 1).writeLock().unlock();
         }
-
+        needNext = false;
+        routeLocks.get(route - 1).unlockWrite(stamp);
         return ticket;
     }
 
@@ -166,19 +160,15 @@ public class TicketingDS implements TicketingSystem {
         // require route lock
         boolean needNext = true;
         int num = 0;
-        routeLocks.get(route - 1).readLock().lock();
-        try {
-            for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
-                // System.out.print(allSitesState.get(i).toAllString());
-                if (allSitesState.get(i).haveSite(departure, arrival)) {
-                    num++;
-                }
+        long stamp = routeLocks.get(route - 1).readLock();
+        for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
+            // System.out.print(allSitesState.get(i).toAllString());
+            if (allSitesState.get(i).haveSite(departure, arrival)) {
+                num++;
             }
-            needNext = false;
-        } finally {
-            routeLocks.get(route - 1).readLock().unlock();
         }
-
+        needNext = false;
+        routeLocks.get(route - 1).unlockRead(stamp);
         return num;
     }
 
@@ -195,18 +185,14 @@ public class TicketingDS implements TicketingSystem {
                 // flag = false;
             } else {
                 // flag = true;
-                routeLocks.get(route - 1).writeLock().lock();
-                try {
-                    tids.put(ticket.tid, false);
-                    SiteState siteState = getTidSiteState.get(ticket.tid);
-                    flag = siteState.RemovePassenger(ticket);
-                    if(siteState.isNonePassenger()){
-                        FreeList.get(ticket.route - 1).add(siteState);
-                    }
-                } finally {
-                    //lock.unlock();
-                    routeLocks.get(route - 1).writeLock().unlock();
+                long stamp = routeLocks.get(route - 1).writeLock();
+                tids.put(ticket.tid, false);
+                SiteState siteState = getTidSiteState.get(ticket.tid);
+                flag = siteState.RemovePassenger(ticket);
+                if(siteState.isNonePassenger()){
+                    FreeList.get(ticket.route - 1).add(siteState);
                 }
+                routeLocks.get(route - 1).unlockWrite(stamp);
             }
         }
         needNext = false;
