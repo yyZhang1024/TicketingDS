@@ -102,7 +102,6 @@ public class TicketingDS implements TicketingSystem {
 
     @Override
     public Ticket buyTicket(String passenger, int route, int departure, int arrival) {
-        boolean needNext = true;
         Ticket ticket = null;
         long stamp = routeLocks.get(route - 1).writeLock();
         LinkedList<SiteState> FreeRouteList = FreeList.get(route - 1);
@@ -150,7 +149,6 @@ public class TicketingDS implements TicketingSystem {
                 }
             }
         }
-        needNext = false;
         routeLocks.get(route - 1).unlockWrite(stamp);
         return ticket;
     }
@@ -158,7 +156,6 @@ public class TicketingDS implements TicketingSystem {
     @Override
     public int inquiry(int route, int departure, int arrival) {
         // require route lock
-        boolean needNext = true;
         int num = 0;
         long stamp = routeLocks.get(route - 1).readLock();
         for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
@@ -167,14 +164,12 @@ public class TicketingDS implements TicketingSystem {
                 num++;
             }
         }
-        needNext = false;
         routeLocks.get(route - 1).unlockRead(stamp);
         return num;
     }
 
     @Override
     public boolean refundTicket(Ticket ticket) {
-        boolean needNext = true;
         boolean flag = false;
         int route = ticket.route;
         if (!tids.containsKey(ticket.tid) || !tids.get(ticket.tid) || illegal(ticket)){
@@ -195,7 +190,6 @@ public class TicketingDS implements TicketingSystem {
                 routeLocks.get(route - 1).unlockWrite(stamp);
             }
         }
-        needNext = false;
         // 如果tid是无效的，或者已经被回收了，那失败，否则退票
         return flag;
     }
