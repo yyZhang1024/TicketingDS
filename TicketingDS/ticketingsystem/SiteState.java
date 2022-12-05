@@ -1,30 +1,17 @@
 package ticketingsystem;
 
-import java.util.LinkedList;
 
 class SiteState implements SiteStateBase{
-    //boolean valid;
-    private volatile int  SiteRouteId;   // 车次
-    private volatile int SiteCoachId;   // 车厢号
-    private volatile int SiteSeatId;    // 座位号
-    //    boolean haveOnes;   // 是否被占用
-    private LinkedList<Ticket> passengerTickets;
+    private int SiteRouteId;   // 车次
+    private int SiteCoachId;   // 车厢号
+    private int SiteSeatId;    // 座位号
+    private int siteStateBits;
     @Override
     public String toString(){
         String pnt = " SiteState   SiteRouteId: " + SiteRouteId + " SiteCoachId: " + SiteCoachId + " SiteSeatId: " + SiteSeatId + "\n";
         return pnt;
     }
-    public String toAllString(){
-        // String pnt = " SiteState   SiteRouteId: " + SiteRouteId + " SiteCoachId: " + SiteCoachId + " SiteSeatId: " + SiteSeatId;
-        String pnt = "\n";
-        for (Ticket ticket: passengerTickets) {
-            pnt += ticket.passenger +  " route: " + ticket.route +  " tid: " + ticket.tid +  " departure: " + ticket.departure +  " arrival:" + ticket.arrival +  "\n";
-        }
-        return pnt;
-    }
-    //    public int GetRoute() {
-    //        return SiteRouteId;
-    //    }
+
     public int GetCoach() {
         return SiteCoachId;
     }
@@ -35,41 +22,59 @@ class SiteState implements SiteStateBase{
         SiteRouteId = routeid;
         SiteCoachId = coachid;
         SiteSeatId = seatid;
-        // haveOnes = false;
-        passengerTickets = new LinkedList();
-        // valid = true;
+        siteStateBits = 0;
     }
-    public boolean isNonePassenger(){
-        return passengerTickets.isEmpty();
+    int getIndex(Ticket ticket) {
+        int departure = ticket.departure - 1;
+        int arrival = ticket.arrival - 1;
+        return (departure*(57 - departure) / 2) + arrival - 1;
     }
-    public boolean AddPassenger(Ticket ticket) {
-        // return passengerTickets.add(ticket);
-        boolean t = passengerTickets.add(ticket);
-        assert (t);
-        return true;
+    int getIndex(int departure, int arrival) {
+        departure--;
+        arrival--;
+        return (departure*(57 - departure) / 2) + arrival - 1;
+    }
+    public void AddPassenger(Ticket ticket) {
+        //        int departure = ticket.departure;
+        //        int arrival = ticket.arrival;
+        //        departure--;
+        //        arrival--;
+        //        int base = 2 << departure;
+        //        for (int i = departure; i < arrival; i++) {
+        //            siteStateBits |= base;
+        //            base <<= 1;
+        //        }
+        final int bits = allSateArray[getIndex(ticket)];
+        siteStateBits |= bits;
     }
 
-    public boolean RemovePassenger(Ticket ticket) {
-        // return passengerTickets.remove(ticket);
-        boolean t = passengerTickets.remove(ticket);
-        assert (t);
-        return true;
-    }
-    public boolean IsCross(int departure1, int departure2, int arrival1, int arrival2)
-    {
-        // int departure = Math.max(departure1, departure2);
-        // int arrival = Math.min(arrival1, arrival2);
-        // return arrival >= departure;
-        // return !((arrival1 <= departure2) || (departure1 >= arrival2));
-        return arrival2 >= departure1 && arrival2 <= arrival1 || departure2 >= departure1 && departure2 <= arrival1 || departure1 >= departure2 && departure1 <= arrival2 || arrival1 >= departure2 && arrival1 <= arrival2;
+    public void RemovePassenger(Ticket ticket) {
+        //        int occupyBits = 0;
+        //        int departure = ticket.departure;
+        //        int arrival = ticket.arrival;
+        //        departure--;
+        //        arrival--;
+        //        int base = 2 << departure;
+        //        for (int i = departure; i < arrival; i++) {
+        //            occupyBits |= base;
+        //            base <<= 1;
+        //        }
+        //        occupyBits = ~occupyBits;
+        //        siteStateBits &= occupyBits;
+        final int bits = allSateArray[getIndex(ticket)];
+        siteStateBits &= bits;
     }
     public boolean haveSite(int departure, int arrival) {
-        for(Ticket ticket : passengerTickets){
-            if (IsCross(departure, ticket.departure, arrival - 1, ticket.arrival - 1)) {
-                // if (IsCross(departure, ticket.departure, arrival, ticket.arrival)) {
-                return false;
-            }
-        }
-        return true;
+        //        departure--;
+        //        arrival--;
+        //        int occupyBits = 0;
+        //        int base = 2 << departure;
+        //        for (int i = departure; i < arrival; i++) {
+        //            occupyBits |= base;
+        //            base <<= 1;
+        //        }
+        //        return (occupyBits & siteStateBits) == 0;
+        final int bits = allSateArray[getIndex(departure, arrival)];
+        return (bits & siteStateBits) == 0;
     }
 }
