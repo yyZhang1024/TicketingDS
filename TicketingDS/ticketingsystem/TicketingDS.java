@@ -3,10 +3,7 @@ package ticketingsystem;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.StampedLock;
+import java.util.concurrent.locks.*;
 
 
 public class TicketingDS implements TicketingSystem {
@@ -36,7 +33,9 @@ public class TicketingDS implements TicketingSystem {
     private ArrayList<StampedLock> routeLocks;
     private Map<Long, SiteState> getTidSiteState;
     //指定车次的FreeList，索引从0开始
-    private final AtomicLong nextTid;
+//    private final AtomicLong nextTid;
+    private final BackOffAtomicLong nextTid;
+//    private static CountingNetwork bitonic;
     Lock lock;
 
     // NOTICE: 如果从1开始不能用底下这个函数
@@ -67,13 +66,14 @@ public class TicketingDS implements TicketingSystem {
         stationnum = _stationnum;
         threadnum = _threadnum;
         tids = new ConcurrentHashMap<>();
-        nextTid = new AtomicLong();
+//        nextTid = new AtomicLong();
+        nextTid = new BackOffAtomicLong();
         lock = new ReentrantLock();
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
         allSitesStateLocks = new ArrayList<>(_routenum*_coachnum*_seatnum);
         getTidSiteState = new HashMap<>();
         routeLocks = new ArrayList<>(_routenum);
-
+        // bitonic = new BitonicNetwork(_threadnum + 1);
         // initial Data Structures
         int k = 0;
         for (int _routenumT = 0; _routenumT < _routenum; _routenumT++) {
@@ -97,6 +97,7 @@ public class TicketingDS implements TicketingSystem {
     @Override
     public Ticket buyTicket(String passenger, int route, int departure, int arrival) {
         Ticket ticket = null;
+//        System.out.println("ThreadId: " + ThreadId.get());
         // travel
         for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
             SiteState newSite =  allSitesState.get(i);
@@ -105,6 +106,7 @@ public class TicketingDS implements TicketingSystem {
                 allSitesStateLocks.get(i).unlockRead(stampRead);
                 ticket = new Ticket();
                 // nextTid需要一个锁
+//                ticket.tid = bitonic.traverse(ThreadId.get() + 1);
                 ticket.tid = nextTid.getAndIncrement();
                 ticket.passenger = passenger;
                 ticket.route = route;
@@ -178,3 +180,4 @@ public class TicketingDS implements TicketingSystem {
         return false;
     }
 }
+
