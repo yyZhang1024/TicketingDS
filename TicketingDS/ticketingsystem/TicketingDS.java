@@ -35,9 +35,7 @@ public class TicketingDS implements TicketingSystem {
     //指定车次的FreeList，索引从0开始
 //    private final AtomicLong nextTid;
     private final BackOffAtomicLong nextTid;
-//    private static CountingNetwork bitonic;
-    Lock lock;
-
+    //    private static CountingNetwork bitonic;
     // NOTICE: 如果从1开始不能用底下这个函数
     private int getLinearIdFromZero(int route, int coach, int seat) {
         int linearId = route * coachnum * seatnum + coach  * seatnum + seat;
@@ -66,9 +64,8 @@ public class TicketingDS implements TicketingSystem {
         stationnum = _stationnum;
         threadnum = _threadnum;
         tids = new ConcurrentHashMap<>();
-    //    nextTid = new AtomicLong();
+        //    nextTid = new AtomicLong();
         nextTid = new BackOffAtomicLong();
-        lock = new ReentrantLock();
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
         allSitesStateLocks = new ArrayList<>(_routenum*_coachnum*_seatnum);
         // getTidSiteState = new ConcurrentHashMap<>();
@@ -97,8 +94,6 @@ public class TicketingDS implements TicketingSystem {
     @Override
     public Ticket buyTicket(String passenger, int route, int departure, int arrival) {
         Ticket ticket = null;
-//        System.out.println("ThreadId: " + ThreadId.get());
-        // travel
         boolean find = false;
         ticket = new Ticket();
         ticket.tid = nextTid.getAndIncrement();
@@ -111,22 +106,14 @@ public class TicketingDS implements TicketingSystem {
             long stampRead = allSitesStateLocks.get(i).readLock();
             if (newSite.haveSite(departure, arrival)) {
                 allSitesStateLocks.get(i).unlockRead(stampRead);
-               // ticket = new Ticket();
-                // nextTid需要一个锁
-//                ticket.tid = bitonic.traverse(ThreadId.get() + 1);
-                // ticket.tid = nextTid.getAndIncrement();
-
                 ticket.coach = newSite.GetCoach();
                 ticket.seat = newSite.GetSeat();
-
                 long stampWrite = allSitesStateLocks.get(i).writeLock();
                 if (!newSite.haveSite(departure, arrival)){
                     allSitesStateLocks.get(i).unlockWrite(stampWrite);
                     continue;
                 }
                 newSite.AddPassenger(ticket);
-                // getTidSiteState.put(ticket.tid, newSite);
-                // 分配tid
                 tids.put(ticket.tid, true);
                 allSitesStateLocks.get(i).unlockWrite(stampWrite);
                 find = true;
@@ -172,14 +159,11 @@ public class TicketingDS implements TicketingSystem {
                 SiteState siteState = allSitesState.get(i);
                 tids.put(ticket.tid, false);
                 long stampWrite = allSitesStateLocks.get(i).writeLock();
-                // SiteState siteState = getTidSiteState.get(ticket.tid);
                 siteState.RemovePassenger(ticket);
-                // flag = true;
                 allSitesStateLocks.get(i).unlockWrite(stampWrite);
             }
         }
-        // 如果tid是无效的，或者已经被回收了，那失败，否则退票
-        return true;
+        return flag;
     }
 
     @Override
