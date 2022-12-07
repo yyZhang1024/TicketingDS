@@ -66,7 +66,7 @@ public class TicketingDS implements TicketingSystem {
         stationnum = _stationnum;
         threadnum = _threadnum;
         tids = new ConcurrentHashMap<>();
-//        nextTid = new AtomicLong();
+    //    nextTid = new AtomicLong();
         nextTid = new BackOffAtomicLong();
         lock = new ReentrantLock();
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
@@ -162,6 +162,7 @@ public class TicketingDS implements TicketingSystem {
                 long stampWrite = allSitesStateLocks.get(i).writeLock();
                 tids.put(ticket.tid, false);
                 SiteState siteState = getTidSiteState.get(ticket.tid);
+                siteState.RemovePassenger(ticket);
                 flag = true;
                 allSitesStateLocks.get(i).unlockWrite(stampWrite);
             }
