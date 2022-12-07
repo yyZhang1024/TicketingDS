@@ -31,7 +31,7 @@ public class TicketingDS implements TicketingSystem {
     private ArrayList<SiteState> allSitesState;
     private ArrayList<StampedLock> allSitesStateLocks;
     private ArrayList<StampedLock> routeLocks;
-    private Map<Long, SiteState> getTidSiteState;
+    // private Map<Long, SiteState> getTidSiteState;
     //指定车次的FreeList，索引从0开始
 //    private final AtomicLong nextTid;
     private final BackOffAtomicLong nextTid;
@@ -71,7 +71,7 @@ public class TicketingDS implements TicketingSystem {
         lock = new ReentrantLock();
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
         allSitesStateLocks = new ArrayList<>(_routenum*_coachnum*_seatnum);
-        getTidSiteState = new HashMap<>();
+        // getTidSiteState = new ConcurrentHashMap<>();
         routeLocks = new ArrayList<>(_routenum);
         // bitonic = new BitonicNetwork(_threadnum + 1);
         // initial Data Structures
@@ -99,37 +99,47 @@ public class TicketingDS implements TicketingSystem {
         Ticket ticket = null;
 //        System.out.println("ThreadId: " + ThreadId.get());
         // travel
+        boolean find = false;
+        ticket = new Ticket();
+        ticket.tid = nextTid.getAndIncrement();
+        ticket.passenger = passenger;
+        ticket.route = route;
+        ticket.departure = departure;
+        ticket.arrival = arrival;
         for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
             SiteState newSite =  allSitesState.get(i);
             long stampRead = allSitesStateLocks.get(i).readLock();
             if (newSite.haveSite(departure, arrival)) {
                 allSitesStateLocks.get(i).unlockRead(stampRead);
-                ticket = new Ticket();
+               // ticket = new Ticket();
                 // nextTid需要一个锁
 //                ticket.tid = bitonic.traverse(ThreadId.get() + 1);
-                ticket.tid = nextTid.getAndIncrement();
-                ticket.passenger = passenger;
-                ticket.route = route;
+                // ticket.tid = nextTid.getAndIncrement();
+
                 ticket.coach = newSite.GetCoach();
                 ticket.seat = newSite.GetSeat();
-                ticket.departure = departure;
-                ticket.arrival = arrival;
+
                 long stampWrite = allSitesStateLocks.get(i).writeLock();
                 if (!newSite.haveSite(departure, arrival)){
                     allSitesStateLocks.get(i).unlockWrite(stampWrite);
                     continue;
                 }
                 newSite.AddPassenger(ticket);
-                getTidSiteState.put(ticket.tid, newSite);
+                // getTidSiteState.put(ticket.tid, newSite);
                 // 分配tid
                 tids.put(ticket.tid, true);
                 allSitesStateLocks.get(i).unlockWrite(stampWrite);
+                find = true;
                 break;
             }else {
                 allSitesStateLocks.get(i).unlockRead(stampRead);
             }
         }
-        return ticket;
+        if (find) {
+            return ticket;
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -159,16 +169,17 @@ public class TicketingDS implements TicketingSystem {
             } else {
                 // flag = true;
                 int i = getLinearIdFromOne(ticket.route, ticket.coach, ticket.seat);
-                long stampWrite = allSitesStateLocks.get(i).writeLock();
+                SiteState siteState = allSitesState.get(i);
                 tids.put(ticket.tid, false);
-                SiteState siteState = getTidSiteState.get(ticket.tid);
+                long stampWrite = allSitesStateLocks.get(i).writeLock();
+                // SiteState siteState = getTidSiteState.get(ticket.tid);
                 siteState.RemovePassenger(ticket);
-                flag = true;
+                // flag = true;
                 allSitesStateLocks.get(i).unlockWrite(stampWrite);
             }
         }
         // 如果tid是无效的，或者已经被回收了，那失败，否则退票
-        return flag;
+        return true;
     }
 
     @Override
