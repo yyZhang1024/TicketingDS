@@ -35,48 +35,48 @@ class SiteState implements SiteStateBase{
         return (departure*(57 - departure) / 2) + arrival - 1;
     }
     public void AddPassenger(Ticket ticket) {
-        int departure = ticket.departure;
-        int arrival = ticket.arrival;
-        departure--;
-        arrival--;
-        int base = 2 << departure;
-        for (int i = departure; i < arrival; i++) {
-            siteStateBits |= base;
-            base <<= 1;
-        }
-//        final int bits = allSateArray[getIndex(ticket)];
-//        siteStateBits |= bits;
+        // int departure = ticket.departure;
+        // int arrival = ticket.arrival;
+        // departure--;
+        // arrival--;
+        // int base = 2 << departure;
+        // for (int i = departure; i < arrival; i++) {
+        //     siteStateBits |= base;
+        //     base <<= 1;
+        // }
+       final int bits = allSateArray[getIndex(ticket)];
+       siteStateBits |= bits;
     }
 
     public void RemovePassenger(Ticket ticket) {
-        int occupyBits = 0;
-        int departure = ticket.departure;
-        int arrival = ticket.arrival;
-        departure--;
-        arrival--;
-        int base = 2 << departure;
-        for (int i = departure; i < arrival; i++) {
-            occupyBits |= base;
-            base <<= 1;
-        }
-        occupyBits = ~occupyBits;
-        siteStateBits &= occupyBits;
-//        final int bits = allSateArray[getIndex(ticket)];
-//        siteStateBits &= bits;
+        // int occupyBits = 0;
+        // int departure = ticket.departure;
+        // int arrival = ticket.arrival;
+        // departure--;
+        // arrival--;
+        // int base = 2 << departure;
+        // for (int i = departure; i < arrival; i++) {
+        //     occupyBits |= base;
+        //     base <<= 1;
+        // }
+        // occupyBits = ~occupyBits;
+        // siteStateBits &= occupyBits;
+       final int bits = allSateArray[getIndex(ticket)];
+       siteStateBits &= bits;
     }
     public boolean haveSite(int departure, int arrival) {
         departure--;
         arrival--;
 
-        int occupyBits = 0;
-        int base = 2 << departure;
-        for (int i = departure; i < arrival; i++) {
-            occupyBits |= base;
-            base <<= 1;
-        }
-        return (occupyBits & siteStateBits) == 0;
-//        final int bits = allSateArray[getIndex(departure, arrival)];
-//        return (bits & siteStateBits) == 0;
+        // int occupyBits = 0;
+        // int base = 2 << departure;
+        // for (int i = departure; i < arrival; i++) {
+        //     occupyBits |= base;
+        //     base <<= 1;
+        // }
+        // return (occupyBits & siteStateBits) == 0;
+       final int bits = allSateArray[getIndex(departure, arrival)];
+       return (bits & siteStateBits) == 0;
     }
     public void printSite() {
         System.out.print("Site Bits : ");
