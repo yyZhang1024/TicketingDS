@@ -80,23 +80,25 @@ public class TicketingDS implements TicketingSystem {
         ticket.route = route;
         ticket.departure = departure;
         ticket.arrival = arrival;
-        synchronized (allSitesState){
+
             for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++) {
                 SiteState newSite = allSitesState.get(i);
+                synchronized (newSite){
                 if (newSite.haveSite(departure, arrival)) {
-    //                newSite.printSite();
+                    //                newSite.printSite();
                     ticket.coach = newSite.GetCoach();
                     ticket.seat = newSite.GetSeat();
-    //                if (!newSite.haveSite(departure, arrival)){
-    //                    continue;
-    //                }
+                    //                if (!newSite.haveSite(departure, arrival)){
+                    //                    continue;
+                    //                }
                     newSite.AddPassenger(ticket);
                     // tids.add(ticket.tid);
                     find = true;
                     break;
                 }
+                } // synchronized
             }
-        } // synchronized
+
         if (find) {
             return ticket;
         } else {
@@ -119,7 +121,7 @@ public class TicketingDS implements TicketingSystem {
     }
 
     @Override
-    public synchronized boolean refundTicket(Ticket ticket) {
+    public  boolean refundTicket(Ticket ticket) {
         boolean flag = false;
         int route = ticket.route;
         // if (  !tids.contains(ticket.tid)){
@@ -129,7 +131,9 @@ public class TicketingDS implements TicketingSystem {
             flag = true;
             int i = getLinearIdFromOne(ticket.route, ticket.coach, ticket.seat);
             SiteState siteState = allSitesState.get(i);
-            siteState.RemovePassenger(ticket);
+            synchronized(siteState) {
+                siteState.RemovePassenger(ticket);
+            }
             // tids.remove(ticket.tid);
         }
         return flag;
