@@ -61,12 +61,13 @@ class SiteState implements SiteStateBase{
         // }
         // occupyBits = ~occupyBits;
         // siteStateBits &= occupyBits;
-       final int bits = allSateArray[getIndex(ticket)];
+       int bits = allSateArray[getIndex(ticket)];
+       bits = ~bits;
        siteStateBits &= bits;
     }
     public boolean haveSite(int departure, int arrival) {
-        departure--;
-        arrival--;
+        // departure--;
+        // arrival--;
 
         // int occupyBits = 0;
         // int base = 2 << departure;
