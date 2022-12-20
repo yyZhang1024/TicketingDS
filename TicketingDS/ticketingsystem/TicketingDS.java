@@ -13,7 +13,6 @@ public class TicketingDS implements TicketingSystem {
     private final int seatnum;       // 每节车厢的座位 数目
     private final int stationnum;    // 每个车次经停站的数量
     private final int threadnum;     // 线程数目
-    // private Set<Long> tids; // 生成这个tid，用于判断票是否有效，注意：不能用来判断是否还有座位和回收，因为tid一个只会被用一次
 
 
     // (车次号 - 1) * 车厢数目 * 车厢座位数目 + (车厢号 - 1) * 车厢座位数目 + 座位号 ====> 线性座位id (如果从1开始计算)
@@ -47,9 +46,6 @@ public class TicketingDS implements TicketingSystem {
         seatnum = _seatnum;
         stationnum = _stationnum;
         threadnum = _threadnum;
-//        tids = new LinkedHashSet<>();
-        // tids = new ConcurrentSkipListSet<>();
-//        nextTid = new BackOffAtomicLong();
         nextTid = new AtomicLong();
         allSitesState = new ArrayList<>(_routenum*_coachnum*_seatnum);
         // initial Data Structures
@@ -81,9 +77,9 @@ public class TicketingDS implements TicketingSystem {
         ticket.departure = departure;
         ticket.arrival = arrival;
 
-            for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++) {
-                SiteState newSite = allSitesState.get(i);
-                synchronized (newSite){
+        for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++) {
+            SiteState newSite = allSitesState.get(i);
+            synchronized (newSite){
                 if (newSite.haveSite(departure, arrival)) {
                     //                newSite.printSite();
                     ticket.coach = newSite.GetCoach();
@@ -96,8 +92,8 @@ public class TicketingDS implements TicketingSystem {
                     find = true;
                     break;
                 }
-                } // synchronized
-            }
+            } // synchronized
+        }
 
         if (find) {
             return ticket;
@@ -108,11 +104,10 @@ public class TicketingDS implements TicketingSystem {
 
     @Override
     public  int inquiry(int route, int departure, int arrival) {
-        // require route lock
         int num = 0;
         for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
-//            System.out.print("inquiry Site: " + i + ": SitesState: " + allSitesState.get(i).haveSite(departure, arrival) + " Bits :");
-//            allSitesState.get(i).printSite();
+            // System.out.print("inquiry Site: " + i + ": SitesState: " + allSitesState.get(i).haveSite(departure, arrival) + " Bits :");
+            // allSitesState.get(i).printSite();
             if (allSitesState.get(i).haveSite(departure, arrival)) {
                 num++;
             }
@@ -124,17 +119,15 @@ public class TicketingDS implements TicketingSystem {
     public  boolean refundTicket(Ticket ticket) {
         boolean flag = false;
         int route = ticket.route;
-        // if (  !tids.contains(ticket.tid)){
-        //     // flag = false;
-        // } else
-        {
+        if (illegal(ticket)){
+            // flag = false;
+        } else {
             flag = true;
             int i = getLinearIdFromOne(ticket.route, ticket.coach, ticket.seat);
             SiteState siteState = allSitesState.get(i);
             synchronized(siteState) {
                 siteState.RemovePassenger(ticket);
             }
-            // tids.remove(ticket.tid);
         }
         return flag;
     }

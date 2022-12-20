@@ -3,11 +3,9 @@ package ticketingsystem;
 import java.util.LinkedList;
 
 public interface SiteStateBase {
-    //boolean valid;
     int SiteRouteId = 0;      // 车次
     int SiteCoachId = 0;      // 车厢号
     int SiteSeatId = 0;       // 座位号
-    //    boolean haveOnes;   // 是否被占用
     int siteStateBits = 0;
     int GetCoach();
     int GetSeat();
