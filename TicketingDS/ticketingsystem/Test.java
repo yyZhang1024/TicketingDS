@@ -1,30 +1,26 @@
 package ticketingsystem;
 
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.lang.reflect.Array;
+import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.LongAccumulator;
+import java.util.concurrent.atomic.LongAdder;
 
 public class Test {
-	public static void asserts(boolean t){
-//		if(!t){
-//			System.out.println("ERROR!!!");
-//			System.exit(-1);
-//		}
-	}
 	final static Random rand = new Random();
-	static int testnum = 10;
+	static int testnum = 100000;
 	static boolean needOutput = true;
-	static int routenum = 3;
-	static int coachnum = 3;
-	static int seatnum = 5;
-	static int stationnum = 5;
-	static int threadnum = 16;
+	static int routenum = 50;
+	static int coachnum = 20;
+	static int seatnum = 100;
+	static int stationnum = 30;
+	static int threadnum = 6;
 	static int msec = 0;
 	static int nsec = 0;
 	static int refRatio = 10;
-	static int buyRatio = 20;
-	static int inqRatio = 30;
+	static int buyRatio = 30;
+	static int inqRatio = 60;
 	static int totalPc;
 	static TicketingDS tds;
 	volatile static boolean initLock = false;
@@ -32,59 +28,52 @@ public class Test {
 	final static List<Integer> freqList = new ArrayList<Integer>();
 	final static List<Ticket> currentTicket = new ArrayList<Ticket>();
 	final static List<String> currentRes = new ArrayList<String>();
+	final static List<Integer> currentNum = new ArrayList<Integer>();
+
+	final static List<Long> buyNum = new ArrayList<Long>();
+	final static List<Long> buyTime = new ArrayList<Long>();
+
+
+	final static List<Long> inquiryNum = new ArrayList<Long>();
+	final static List<Long> inquiryTime = new ArrayList<Long>();
+
+	final static List<Long> refundNum = new ArrayList<Long>();
+	final static List<Long> refundTime = new ArrayList<Long>();
+
+	static List<String> logs = new LinkedList<>();
 	final static ArrayList<List<Ticket>> soldTicket = new ArrayList<List<Ticket>>();
 	public static String getPassengerName() {
 		long uid = rand.nextInt(testnum);
 		return "passenger" + uid;
 	}
+	public static String ticketToString(Ticket ticket) {
+		return ticket.passenger + " tid: " + ticket.tid + " route: " + ticket.route + " coach: " + ticket.coach + " seat: " + ticket.seat + " departure: " + ticket.departure + " arrival: " + ticket.arrival;
+	}
 	public static void sampleSeqTest(){
+		routenum = 1;
+		coachnum = 1;
+		seatnum = 5;
+		threadnum = 1;
 		tds = new TicketingDS(routenum, coachnum, seatnum, stationnum, threadnum);
-		// 7640354 8705514 0 buyTicket 1 passenger45 3 1 3 4 1 true
-		// 8539293 9282449 3 inquiry 0 passenger87 1 0 4 5 15 true
-		// 9550221 9613249 3 inquiry 0 passenger61 1 0 3 5 15 true
-		// 9866533 9996782 3 inquiry 0 passenger42 3 0 4 5 15 true
-		// 10846476 10934945 3 inquiry 0 passenger68 1 0 4 5 15 true
+		Ticket t1 = tds.buyTicket("passenger383", 1, 2, 3);
+		System.out.println(ticketToString(t1));
+		//5
+		System.out.println(tds.inquiry(1, 1, 2));
 
-//		tds.buyTicket("passenger45", 3, 1, 3);
-		/*
-		*
-(preTime + " " + postTime + " " +  ThreadId.get() + " " + actionName + " " + ticket.tid + " " + ticket.passenger + " " +
-ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arrival + " " + ticket.seat + " " + currentRes.get(ThreadId.get()));
+		Ticket t2 = tds.buyTicket("passenger383", 1, 1, 2);
+		System.out.println(ticketToString(t2));
+		//5
+		System.out.println(tds.inquiry(1, 3, 4));
 
-10254734 11262772 0 inquiry 0 passenger131 2  1 2 		15
-11663277 11873954 1 buyTicket 1 passenger383 1  2 5 	1
-12222903 12400913 3 inquiry 0 passenger346 1  2 5 		14
-*
-12641940 12716595 0 buyTicket 2 passenger453 1  4 5 	2
-12869852 12941320 0 inquiry 0 passenger844 1  2 4 		14
-*
-13047321 13154080 1 refundTicket 1 passenger383 1  2 5 	1
-13308481 13410324 2 inquiry 0 passenger116 3  2 3 		15
-13616778 14142327 2 inquiry 0 passenger214 2  4 5 		15
-*
-14338380 14385823 1 buyTicket 3 passenger388 1  2 3 	3
-14540932 14618285 2 inquiry 0 passenger338 3  2 4 		15
-14762389 14839476 3 inquiry 0 passenger812 3  4 5 		15
-14972814 15051194 3 inquiry 0 passenger509 1  3 4 		15
-		* */
-		asserts(tds.inquiry(2, 1,2) == 15);
-		Ticket t1 = tds.buyTicket("passenger383", 1, 2, 5);
-		asserts(tds.inquiry(1, 2,5) == 14); // should 14
 
-		Ticket t2 = tds.buyTicket("passenger453", 1, 4, 5);
-		asserts(tds.inquiry(1, 2,4) == 14); // should 14
+		Ticket t3 = tds.buyTicket("passenger383", 1, 3, 4);
+		System.out.println(ticketToString(t3));
+		System.out.println(tds.inquiry(1, 1, 5));
 
+
+		System.out.println(ticketToString(t1));
 		tds.refundTicket(t1);
-		asserts(tds.inquiry(3, 2,3) == 15);
-		asserts(tds.inquiry(2, 4,5) == 15);
-
-		asserts(tds.inquiry(1, 3,4) == 15);
-		Ticket t3 = tds.buyTicket("passenger388", 1, 2, 3);
-		asserts(tds.inquiry(3, 2,4) == 15);
-		asserts(tds.inquiry(3, 4,5) == 15);
-		// 左闭右开区间，这里又不是左闭又开了？？？？？
-		asserts(tds.inquiry(1, 3,4) == 14); // should eq 14
-		//ToDo
+		System.out.println(tds.inquiry(1, 2, 3));
 	}
 
 	public static void initialization() {
@@ -94,6 +83,13 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 			soldTicket.add(threadTickets);
 			currentTicket.add(null);
 			currentRes.add("");
+			currentNum.add(-1);
+			inquiryTime.add(0L);
+			inquiryNum.add(0L);
+			buyNum.add(0L);
+			buyTime.add(0L);
+			refundNum.add(0L);
+			refundTime.add(0L);
 		}
 		//method freq is up to
 		methodList.add("refundTicket");
@@ -147,6 +143,7 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 				ticket.departure = rand.nextInt(stationnum - 1) + 1;
 				ticket.arrival = ticket.departure + rand.nextInt(stationnum - ticket.departure) + 1; // arrival is always greater than departure
 				ticket.seat = tds.inquiry(ticket.route, ticket.departure, ticket.arrival);
+				currentNum.set(ThreadId.get(), ticket.seat);
 				currentTicket.set(ThreadId.get(), ticket);
 				currentRes.set(ThreadId.get(), "true");
 				return true;
@@ -157,10 +154,17 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 	}
 	public static void print(long preTime, long postTime, String actionName){
 		Ticket ticket = currentTicket.get(ThreadId.get());
-		System.out.println(preTime + " " + postTime + " " +  ThreadId.get() + " " + actionName + " " + ticket.tid + " " + ticket.passenger + " " + ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arrival + " " + ticket.seat + " " + currentRes.get(ThreadId.get()));
+		String s = preTime + " " + postTime + " " +  ThreadId.get() + " " + actionName + " " + ticket.tid + " " + ticket.passenger + " " + ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arrival + " " + ticket.seat + " " + currentRes.get(ThreadId.get());
+		logs.add(s);
+		System.out.println(s);
 	}
 	// output through
 	public static void multiThreadTest() throws InterruptedException {
+		// change global variable
+		// threadnum = threadnumChange;
+		// msec = msecChange;
+		// nsec = nsecChange;
+
 		Thread[] threads = new Thread[threadnum];
 		// initialization();
 		final long startTime = System.nanoTime();
@@ -192,8 +196,18 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 								long preTime = System.nanoTime() - startTime;
 								boolean flag = execute(j);
 								long postTime = System.nanoTime() - startTime;
-								if(flag && needOutput){
-									print(preTime, postTime, methodList.get(j));
+								if(flag){
+									int threadid = ThreadId.get();
+									if (methodList.get(j) == "inquiry") {
+										inquiryNum.set(threadid, inquiryNum.get(threadid) + 1);
+										inquiryTime.set(threadid, inquiryTime.get(threadid) + (postTime - preTime));
+									} else if (methodList.get(j) == "buyTicket") {
+										buyNum.set(threadid, buyNum.get(threadid) + 1);
+										buyTime.set(threadid, buyTime.get(threadid) + (postTime - preTime));
+									} else {
+										refundNum.set(threadid, refundNum.get(threadid) + 1);
+										refundTime.set(threadid, refundTime.get(threadid) + (postTime - preTime));
+									}
 								}
 								cnt += freqList.get(j);
 							}
@@ -213,22 +227,67 @@ ticket.route + " " + ticket.coach + " " + ticket.departure + " " + ticket.arriva
 		}
 		final long testFinishTime = System.nanoTime();
 		int totalTestNum = testnum * threadnum ;
-		final long actualUseNs = testFinishTime - testStartTime - totalTestNum * nsec - totalTestNum * msec * 10000000L;
-		final long timeUse = actualUseNs/(1000);
-		System.out.println("Multi Thread Test Using:" + timeUse + "us");
-		System.out.println("times/thread:" + timeUse/totalTestNum + "us/thread");
+		long actualUseNs = testFinishTime - testStartTime - totalTestNum * nsec - totalTestNum * msec * 1000000L;
+		long timeUse = actualUseNs/(1000000L);
+		long totalbuyTime = 0;
+		long totalrefundTime = 0;
+		long totalinquiryTime = 0;
+		long totalbuyNum = 0;
+		long totalrefundNum = 0;
+		long totalinquiryNum = 0;
+		for (int i = 0; i< threadnum; i++) {
+			totalbuyTime += buyTime.get(i);
+			totalrefundTime += refundTime.get(i);
+			totalinquiryTime += inquiryTime.get(i);
+
+			totalbuyNum += buyNum.get(i);
+			totalrefundNum += refundNum.get(i);
+			totalinquiryNum += inquiryNum.get(i);
+		}
+
+		long avgBuyTime = totalbuyTime / totalbuyNum;
+		long avgRefundTime = totalrefundTime / totalrefundNum;
+		long avgInquiryTime = totalinquiryTime / totalinquiryNum;
+
+		System.out.println("Multi Thread Test Using: " + timeUse + " ms AverageBuyTime: " + avgBuyTime + "ns AverageRefundTime: " + avgRefundTime + "ns AverageInquiryTime: " + avgInquiryTime + "ns ThreadNum:" + threadnum + " Throughput: " + totalTestNum/timeUse + " ops/ms");
 	}
+	static void generateAllState() {
+		int k = 0;
+		for (int departure = 0; departure < 29; departure++) {
+			for (int arrival = departure + 1; arrival < 30; arrival++) {
+				int occupyBits = 0;
+				int base = 2 << departure;
+				for (int i = departure; i < arrival; i++) {
+					occupyBits |= base;
+					base <<= 1;
+				}
+				// System.out.println(occupyBits + " departure: " + departure + " arrival:" + arrival + " total:" + k + " test: " + ((departure*(30 + 30 - departure + 1) / 2) + arrival - 2 * departure - 1));
+				// System.out.println(occupyBits+",");
+				System.out.println(occupyBits + " departure: " + departure + " arrival:" + arrival + " total:" + k + " test: " + ((departure*(57 - departure) / 2) + arrival - 1));
+
+				k++;
+			}
+		}
+	}
+
 	public static void main(String[] args) throws InterruptedException {
-        routenum = 3;
-		coachnum = 3;
-		seatnum = 5;
-		stationnum = 5;
-		threadnum = 2;
-		msec = 0;
-		nsec = 50;
-		testnum = 500;
-		needOutput = false;
-		// sampleSeqTest();
-		multiThreadTest();
+
+
+		if (true) {
+			needOutput = false;
+			// generateAllState();
+			// sampleSeqTest();
+			threadnum = 3;
+			testnum = 50;
+			multiThreadTest();
+//			verify();
+		} else {
+			needOutput = false;
+			// generateAllState();
+			// sampleSeqTest();
+			threadnum = Integer.parseInt(args[0]);
+			testnum = Integer.parseInt(args[1]);
+			multiThreadTest();
+		}
 	}
 }

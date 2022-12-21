@@ -103,7 +103,7 @@ public class TicketingDS implements TicketingSystem {
     }
 
     @Override
-    public  int inquiry(int route, int departure, int arrival) {
+    public int inquiry(int route, int departure, int arrival) {
         int num = 0;
         for (int i = getRouteFirstIndex(route - 1); i <= getRouteLastIndex(route - 1); i++){
             // System.out.print("inquiry Site: " + i + ": SitesState: " + allSitesState.get(i).haveSite(departure, arrival) + " Bits :");
